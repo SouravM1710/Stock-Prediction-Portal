@@ -1,0 +1,10 @@
+{
+  "builds": [
+    { "src": "stock_prediction_main/asgi.py", "use": "@vercel/python" },
+    { "src": "manage.py", "use": "@vercel/python" }
+  ],
+  "routes": [
+    { "src": "/static/(.*)", "dest": "/static/$1" },
+    { "src": "/(.*)", "dest": "stock_prediction_main/asgi.py" }
+  ]
+}

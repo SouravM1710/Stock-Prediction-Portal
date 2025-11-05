@@ -1,8 +1,10 @@
 {
-  "builds": [
-    { "src": "stock_prediction_main/asgi.py", "use": "@vercel/python" },
-    { "src": "manage.py", "use": "@vercel/python" }
-  ],
+  "functions": {
+    "api/index.py": {
+      "runtime": "python3.11",
+      "maxDuration": 30
+    }
+  },
   "routes": [
     { "src": "/static/(.*)", "dest": "/static/$1" },
     { "src": "/(.*)", "dest": "stock_prediction_main/asgi.py" }

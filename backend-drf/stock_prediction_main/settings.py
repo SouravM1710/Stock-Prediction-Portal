@@ -27,7 +27,11 @@ SECRET_KEY = config('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
+<<<<<<< HEAD
 ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+=======
+ALLOWED_HOSTS = []
+>>>>>>> f244ac9a61fa92e7e7dd9574950d101e4da6c841
 
 
 # Application definition
@@ -131,6 +135,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+<<<<<<< HEAD
+=======
+    '.vercel.app'
+>>>>>>> f244ac9a61fa92e7e7dd9574950d101e4da6c841
 ]
 
 REST_FRAMEWORK = {

@@ -11,7 +11,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
-from decouple import config
+from decouple import config, Csv
+import dj_database_url
 from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -27,11 +28,11 @@ SECRET_KEY = config('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-<<<<<<< HEAD
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
-=======
-ALLOWED_HOSTS = []
->>>>>>> f244ac9a61fa92e7e7dd9574950d101e4da6c841
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS',
+    default='localhost,127.0.0.1,.vercel.app',
+    cast=Csv(),
+)
 
 
 # Application definition
@@ -85,10 +86,10 @@ WSGI_APPLICATION = 'stock_prediction_main.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        conn_max_age=600,
+    )
 }
 
 
@@ -135,10 +136,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
-<<<<<<< HEAD
-=======
-    '.vercel.app'
->>>>>>> f244ac9a61fa92e7e7dd9574950d101e4da6c841
+    "http://127.0.0.1:5173",
+]
+
+# Allow any local dev-server port and any Vercel frontend origin
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^http://localhost:\d+$",
+    r"^http://127\.0\.0\.1:\d+$",
+    r"^https://.*\.vercel\.app$",
 ]
 
 REST_FRAMEWORK = {

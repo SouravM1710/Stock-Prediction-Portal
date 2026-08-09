@@ -3,12 +3,13 @@ asgiref==3.7.2
 astunparse==1.6.3
 beautifulsoup4==4.12.3
 certifi==2024.2.2
-cffi==1.16.0
+cffi==2.1.1
 charset-normalizer==3.3.2
 contourpy==1.2.1
-curl_cffi==0.7.0
+curl_cffi==0.16.0
 cycler==0.12.1
 Django==4.2.11
+dj-database-url==2.1.0
 django-cors-headers==4.3.1
 djangorestframework==3.14.0
 djangorestframework-simplejwt==5.3.1
@@ -42,6 +43,7 @@ peewee==3.17.1
 pillow==10.2.0
 platformdirs==4.2.0
 protobuf==3.20.3
+psycopg2-binary==2.9.9
 pycparser==2.21
 Pygments==2.17.2
 PyJWT==2.8.0
@@ -70,4 +72,4 @@ Werkzeug==3.0.1
 wheel==0.42.0
 whitenoise==6.6.0
 wrapt==1.14.1
-yfinance==0.2.37
+yfinance==1.5.2

@@ -1,7 +1,7 @@
 # Stock Prediction Portal
 
-[![Python Version](https://img.shields.io/badge/python-3.11-blue?style=flat&logo=python)](https://www.python.org/)
-[![Django Version](https://img.shields.io/badge/Django-5.2-green?style=flat)](https://www.djangoproject.com/)
+[![Python Version](https://img.shields.io/badge/python-3.10/3.11-blue?style=flat&logo=python)](https://www.python.org/)
+[![Django Version](https://img.shields.io/badge/Django-4.2-green?style=flat)](https://www.djangoproject.com/)
 [![React Version](https://img.shields.io/badge/React-19.1.1-61DAFB?logo=react)](https://react.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen?style=flat)](https://github.com/yourrepo/build)
@@ -71,8 +71,8 @@ A web portal that allows users to:
 ## Tech Stack
 | Layer | Technology |
 |-------|------------|
-| **Backend** | Django 5.2, Django REST Framework, djangorestframework‑simplejwt, TensorFlow/Keras |
-| **Frontend** | React 19.1, Vite, TypeScript, axios, react-router-dom |
+| **Backend** | Django 4.2, Django REST Framework, djangorestframework‑simplejwt, TensorFlow/Keras |
+| **Frontend** | React 19.1, Vite (JSX), axios, react-router-dom |
 | **Data** | yfinance API, pandas, numpy, scikit‑learn |
 | **Visualization** | Matplotlib (static plots) |
 | **Auth** | JWT (access & refresh tokens) |
@@ -230,22 +230,51 @@ npm run dev
 ---
 
 ## Environment Variables
-Create a `.env` file in the `backend-drf` directory:
+Create a `.env` file in the `backend-drf` directory (see `.env.example`):
 
 ```env
 SECRET_KEY=your_secure_secret_key
 DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1
+# Optional Postgres connection string; falls back to SQLite when omitted
+DATABASE_URL=
 ```
 
-The Django app reads these via `python-decouple`.  
+The Django app reads these via `python-decouple`.
 
 ---
 
 ## Important Notes
-- **Media Folder** – Ensure `MEDIA_ROOT` directory exists and is writable.  
-- **Model File** – Place `stock_prediction_model.keras` in the project root for the backend to load the ML model.  
-- **CORS** – Frontend (`http://localhost:5173`) is whitelisted in Django settings.  
-- **Security** – Never commit real secret keys; use environment variables for production.  
+- **Media Folder** – Generated plots are written to `MEDIA_ROOT` (`backend-drf/media/`) and served regardless of `DEBUG`.  
+- **Model File** – `backend-drf/stock_prediction_model.keras` is loaded by the API. It has been converted from the original Keras 3.11 save to a Keras 2.15‑compatible format (same weights); the original is kept under `Resources/`.  
+- **Python version** – TensorFlow 2.15 requires Python ≤3.11. Use 3.10 or 3.11 (the Docker image uses 3.10).  
+- **CORS** – `http://localhost:5173`, `http://127.0.0.1:5173`, and any `https://*.vercel.app` origin are allowed in Django settings.  
+- **Security** – Never commit real secret keys; use environment variables for production.
+
+---
+
+## Deployment
+
+The ML backend cannot run on Vercel serverless functions (TensorFlow exceeds the ~500 MB bundle limit and requires Python ≤3.11), so the app is split:
+
+### Backend → a container host (Railway, Render, Fly.io, Cloud Run, or a VPS)
+A `Dockerfile` is included in `backend-drf/`. Deploy the `backend-drf/` directory as a Docker container.
+
+Required environment variables (set on the host):
+| Variable | Example | Notes |
+|----------|---------|-------|
+| `SECRET_KEY` | (generate with `get_random_secret_key`) | Required |
+| `DEBUG` | `False` | |
+| `ALLOWED_HOSTS` | `your-app.up.railway.app` | The deployed API host |
+| `DATABASE_URL` | `postgresql://...` | Optional; falls back to SQLite |
+
+### Frontend → Vercel
+Deploy `frontend-react/` to Vercel (Vite is auto‑detected; `vercel.json` pins the build). Set these **build‑time** environment variables:
+
+```env
+VITE_BACKEND_BASE_API=https://<your-backend-domain>/api/v1
+VITE_BACKEND_ROOT=https://<your-backend-domain>
+```
 
 ---
 

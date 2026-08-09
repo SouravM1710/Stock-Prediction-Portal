@@ -29,10 +29,15 @@ class StockPredictionAPIView(APIView):
             now = datetime.now()
             start = datetime(now.year-10, now.month, now.day)
             end = now
-            df = yf.download(ticker, start, end)
+            df = yf.download(ticker, start, end, progress=False)
             # print(df)
             if df.empty:
                 return Response({"error": "No data found for the given ticker.",'status': status.HTTP_404_NOT_FOUND})
+
+            # yfinance >=0.2.40 returns MultiIndex columns for single tickers;
+            # flatten them so df.Close is a plain Series (matching the model pipeline)
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
             df = df.reset_index()
 
             #Generate basic plot
@@ -83,7 +88,7 @@ class StockPredictionAPIView(APIView):
             scaler = MinMaxScaler(feature_range=(0,1))
 
             # Load ML Model
-            model = load_model('stock_prediction_model.keras')
+            model = load_model(os.path.join(settings.BASE_DIR, 'stock_prediction_model.keras'))
 
             # Preparing Test Data
             past_100_days = data_training.tail(100)

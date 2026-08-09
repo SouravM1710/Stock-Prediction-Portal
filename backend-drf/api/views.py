@@ -18,6 +18,22 @@ from sklearn.metrics import mean_squared_error, r2_score
 
 # Create your views here.
 
+# The Keras model is loaded once and reused. Loading it on every request
+# wastes memory and slows predictions on constrained hosts.
+_model = None
+
+def get_model():
+    global _model
+    if _model is None:
+        _model = load_model(os.path.join(settings.BASE_DIR, 'stock_prediction_model.keras'))
+    return _model
+
+
+class HealthView(APIView):
+    """Liveness check used by deployment hosts (Render/Railway health checks)."""
+    def get(self, request):
+        return Response({"status": "ok"})
+
 
 class StockPredictionAPIView(APIView):
     def post(self, request):
@@ -87,8 +103,8 @@ class StockPredictionAPIView(APIView):
             # Scaling down the data between 0 and 1
             scaler = MinMaxScaler(feature_range=(0,1))
 
-            # Load ML Model
-            model = load_model(os.path.join(settings.BASE_DIR, 'stock_prediction_model.keras'))
+            # Get ML Model (loaded once and cached)
+            model = get_model()
 
             # Preparing Test Data
             past_100_days = data_training.tail(100)

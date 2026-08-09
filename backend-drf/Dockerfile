@@ -5,7 +5,11 @@ FROM python:3.10-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    # Keep TensorFlow's memory and CPU usage small on free-tier hosts
+    OMP_NUM_THREADS=1 \
+    TF_NUM_INTRAOP_THREADS=1 \
+    TF_NUM_INTEROP_THREADS=1
 
 WORKDIR /app
 
@@ -22,5 +26,5 @@ COPY . .
 EXPOSE 8000
 
 # Apply migrations on boot, then serve via gunicorn.
-# 1 worker keeps TensorFlow's memory footprint predictable.
-CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn stock_prediction_main.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 1 --threads 4 --timeout 300"]
+# 1 worker + 2 threads keeps TensorFlow's memory footprint low.
+CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn stock_prediction_main.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 1 --threads 2 --timeout 300"]

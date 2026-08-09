@@ -1,0 +1,19 @@
+# One-click blueprint for Render. Import this repo and Render creates the
+# backend service automatically with these settings.
+services:
+  - type: web
+    name: stock-prediction-backend
+    runtime: docker
+    repo: https://github.com/SouravM1710/Stock-Prediction-Portal
+    rootDir: backend-drf
+    plan: free
+    healthCheckPath: /api/v1/health/
+    envVars:
+      # SECRET_KEY is generated randomly on first deploy (never commit a real key)
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      # Covers any *.onrender.com URL Render assigns, plus local dev
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com,localhost,127.0.0.1"

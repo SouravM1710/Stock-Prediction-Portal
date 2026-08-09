@@ -7,25 +7,28 @@ from rest_framework.response import Response
 import yfinance as yf
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 from datetime import datetime
 import os
+import threading
 from django.conf import settings
 from .utils import save_plot
-from sklearn.preprocessing import MinMaxScaler
-from keras.models import load_model
-from sklearn.metrics import mean_squared_error, r2_score
 
 # Create your views here.
 
-# The Keras model is loaded once and reused. Loading it on every request
-# wastes memory and slows predictions on constrained hosts.
+# The Keras model is loaded lazily (first prediction) and reused.
+# Importing TensorFlow at startup uses ~500MB of RAM, which can exceed
+# free-tier limits and kill the health check. Loading it on the first
+# predict keeps boot memory low.
 _model = None
+_model_lock = threading.Lock()
 
 def get_model():
     global _model
     if _model is None:
-        _model = load_model(os.path.join(settings.BASE_DIR, 'stock_prediction_model.keras'))
+        with _model_lock:
+            if _model is None:
+                from keras.models import load_model
+                _model = load_model(os.path.join(settings.BASE_DIR, 'stock_prediction_model.keras'))
     return _model
 
 
@@ -37,6 +40,11 @@ class HealthView(APIView):
 
 class StockPredictionAPIView(APIView):
     def post(self, request):
+        # Heavy ML/data-science imports happen here so they don't load at boot
+        import matplotlib.pyplot as plt
+        from sklearn.preprocessing import MinMaxScaler
+        from sklearn.metrics import mean_squared_error, r2_score
+
         serializer = StockPredictionSerializer(data=request.data)
         if serializer.is_valid():
             ticker = serializer.validated_data['ticker']

@@ -4,6 +4,7 @@ from .serializers import StockPredictionSerializer
 from rest_framework import status
 from rest_framework.response import Response
 
+import json
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -75,11 +76,20 @@ class StockPredictionAPIView(APIView):
         ticker = serializer.validated_data['ticker']
         try:
             result = self._run_prediction(ticker)
+            # JSON-encode here, inside the try, so any encoding failure (e.g.
+            # numpy>=2's float64 no longer being a float subclass) becomes a
+            # JSON error with the real message instead of escaping the view as
+            # a raw 500 during DRF's post-view response rendering.
+            result = json.loads(json.dumps(result, default=float))
             return Response(result)
         except Exception as e:
             logger.exception("Prediction failed for ticker=%s", ticker)
+            from importlib.metadata import version
             return Response(
-                {"error": f"{type(e).__name__}: {e}"},
+                {
+                    "error": f"{type(e).__name__}: {e}",
+                    "runtime": {p: version(p) for p in ("keras", "tensorflow", "numpy", "h5py")},
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 

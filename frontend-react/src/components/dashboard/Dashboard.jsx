@@ -4,6 +4,14 @@ import { faSpinner } from '@fortawesome/free-solid-svg-icons'
 
 import axiosInstance from '../../axiosInstance';
 
+// Free-tier hosts (Render) cold-start the TensorFlow model on the first
+// predict after idle, which can fail once. Only these conditions are worth
+// one retry — anything else (4xx, auth) should surface immediately.
+const isTransientError = (error) => {
+    if (!error.response) return true; // network error / timeout / no response
+    return [500, 502, 503, 504].includes(error.response.status);
+};
+
 const Dashboard = () => {
 
     const [ticker, setTicker] = useState('')
@@ -32,10 +40,19 @@ const Dashboard = () => {
     const handleSubmit = async (e) =>{
         e.preventDefault();
         setLoading(true)
+        setError(null)
         try {
-            const response = await axiosInstance.post('/predict/',{
-                ticker: ticker
-            })
+            const callPredict = () => axiosInstance.post('/predict/',{ ticker: ticker })
+            let response
+            try {
+                response = await callPredict()
+            } catch (err) {
+                if (isTransientError(err)) {
+                    response = await callPredict() // retry once for cold-start flakiness
+                } else {
+                    throw err
+                }
+            }
             console.log(response.data)
             const backendRoot = import.meta.env.VITE_BACKEND_ROOT
             const plotUrl = `${backendRoot}${response.data.plot_img}`
@@ -55,7 +72,8 @@ const Dashboard = () => {
                 setError(response.data.error)
             }
         } catch (error) {
-            console.error("Error fetching protected data:", error);
+            console.error("Prediction failed:", error);
+            setError(error.response?.data?.error || "Prediction failed. Please try again.");
         }finally{
             setLoading(false)
         }

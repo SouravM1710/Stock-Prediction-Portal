@@ -30,9 +30,34 @@ def get_model():
     if _model is None:
         with _model_lock:
             if _model is None:
-                from keras.models import load_model
-                _model = load_model(os.path.join(settings.BASE_DIR, 'stock_prediction_model.keras'))
+                _model = _load_model_file()
     return _model
+
+def _load_model_file():
+    """Load the trained Keras model, trying candidates in order.
+
+    The legacy H5 is preferred: it loads deterministically across platforms.
+    The .keras file is a Keras 3-format zip whose LSTM weight layout can fail
+    to load under Keras 2.15 on some hosts (e.g. "lstm_cell expected 3
+    variables, but received 0"). Loading is lazy (first predict), so failures
+    surface as a JSON error from the predict view rather than killing boot.
+    """
+    from keras.models import load_model
+    from importlib.metadata import version
+    logger.info(
+        "Loading Keras model. keras=%s tensorflow=%s",
+        version('keras'), version('tensorflow'),
+    )
+    base_dir = settings.BASE_DIR
+    for name in ('stock_prediction_model.h5', 'stock_prediction_model.keras'):
+        path = os.path.join(base_dir, name)
+        if os.path.exists(path):
+            try:
+                logger.info("Loading model from %s", name)
+                return load_model(path)
+            except Exception:
+                logger.exception("Failed to load model from %s", name)
+    raise FileNotFoundError(f"No loadable model file found in {base_dir}")
 
 
 class HealthView(APIView):

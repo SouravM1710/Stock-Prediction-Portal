@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen?style=flat)](https://github.com/yourrepo/build)
 
-![Demo UI](https://stock-prediction-portal-zeta.vercel.app/)
+[Website : ](https://stock-prediction-portal-zeta.vercel.app/)
 
 A full‑stack web application that combines machine‑learning based stock price predictions with a modern React frontend and a Django REST API.
 

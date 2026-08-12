@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from .serializers import StockPredictionSerializer
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 
 import json
 import yfinance as yf
@@ -68,6 +69,8 @@ class HealthView(APIView):
 
 
 class StockPredictionAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
         serializer = StockPredictionSerializer(data=request.data)
         if not serializer.is_valid():

@@ -90,12 +90,8 @@ class StockPredictionAPIView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.exception("Prediction failed for ticker=%s", ticker)
-            from importlib.metadata import version
             return Response(
-                {
-                    "error": f"{type(e).__name__}: {e}",
-                    "runtime": {p: version(p) for p in ("keras", "tensorflow", "numpy", "h5py")},
-                },
+                {"error": f"{type(e).__name__}: {e}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 

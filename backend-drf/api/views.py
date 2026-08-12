@@ -82,6 +82,9 @@ class StockPredictionAPIView(APIView):
             # a raw 500 during DRF's post-view response rendering.
             result = json.loads(json.dumps(result, default=float))
             return Response(result)
+        except ValueError as e:
+            # Invalid ticker / no data — return 404 without version leak
+            return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.exception("Prediction failed for ticker=%s", ticker)
             from importlib.metadata import version
@@ -105,7 +108,7 @@ class StockPredictionAPIView(APIView):
         end = now
         df = yf.download(ticker, start, end, progress=False)
         if df.empty:
-            return Response({"error": "No data found for the given ticker.", 'status': status.HTTP_404_NOT_FOUND})
+            raise ValueError("No data found for the given ticker.")
 
         # yfinance >=0.2.40 returns MultiIndex columns for single tickers;
         # flatten them so df.Close is a plain Series (matching the model pipeline)

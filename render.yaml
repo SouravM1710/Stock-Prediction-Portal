@@ -1,6 +1,12 @@
 # One-click blueprint for Render. Import this repo and Render creates the
 # backend service automatically with these settings.
 services:
+  # Free PostgreSQL database (persists across deploys)
+  - type: pserv
+    name: stock-prediction-db
+    plan: free
+    region: oregon
+
   - type: web
     name: stock-prediction-backend
     runtime: docker
@@ -17,3 +23,8 @@ services:
       # Covers any *.onrender.com URL Render assigns, plus local dev
       - key: ALLOWED_HOSTS
         value: ".onrender.com,localhost,127.0.0.1"
+      # DATABASE_URL auto-linked from the pserv above
+      - key: DATABASE_URL
+        fromDatabase:
+          name: stock-prediction-db
+          property: connectionString

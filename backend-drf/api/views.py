@@ -45,8 +45,27 @@ def _load_model_file():
     variables, but received 0"). Loading is lazy (first predict), so failures
     surface as a JSON error from the predict view rather than killing boot.
     """
+    # Configure TensorFlow for minimal memory before any TF import
+    import os as _os
+    _os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '2')
+    _os.environ.setdefault('TF_NUM_INTRAOP_THREADS', '1')
+    _os.environ.setdefault('TF_NUM_INTEROP_THREADS', '1')
+    # Force TF to use a small per-process GPU/CPU memory fraction
+    _os.environ.setdefault('TF_GPU_ALLOCATOR', 'cuda_malloc_async')  # no-op on CPU
+
     from keras.models import load_model
     from importlib.metadata import version
+    import tensorflow as tf
+
+    # Limit TensorFlow memory growth and visible devices (CPU only)
+    try:
+        tf.config.set_visible_devices([], 'GPU')  # disable GPU entirely
+        # Limit CPU memory allocator
+        tf.config.threading.set_intra_op_parallelism_threads(1)
+        tf.config.threading.set_inter_op_parallelism_threads(1)
+    except Exception:
+        pass  # ignore if TF not fully initialized yet
+
     logger.info(
         "Loading Keras model. keras=%s tensorflow=%s",
         version('keras'), version('tensorflow'),

@@ -14,6 +14,11 @@ set -u
 FRONTEND="${FRONTEND_URL:-https://stock-prediction-portal-zeta.vercel.app}"
 BACKEND="${BACKEND_URL:-https://stock-prediction-backend-i2sg.onrender.com}"
 
+# Test credentials (create a test user if needed, or use existing)
+TEST_USER="${SMOKE_TEST_USER:-smoketest}"
+TEST_PASS="${SMOKE_TEST_PASS:-smoketest123}"
+TEST_EMAIL="${SMOKE_TEST_EMAIL:-smoketest@example.com}"
+
 fail=0
 
 check_http() {
@@ -50,6 +55,44 @@ check_array_length() {
     fi
 }
 
+authenticate() {
+    echo "== Authenticating test user =="
+    # Try login first
+    local login_resp
+    login_resp=$(curl -s -m 30 -X POST "$BACKEND/api/v1/token/" \
+        -H "Content-Type: application/json" \
+        -d "{\"username\":\"$TEST_USER\",\"password\":\"$TEST_PASS\"}")
+
+    if echo "$login_resp" | grep -q '"access"'; then
+        ACCESS_TOKEN=$(echo "$login_resp" | python3 -c "import sys, json; print(json.load(sys.stdin)['access'])" 2>/dev/null)
+        echo "PASS  login successful"
+        return 0
+    fi
+
+    # If login fails, try register
+    echo "  login failed, attempting registration..."
+    local reg_resp
+    reg_resp=$(curl -s -m 30 -X POST "$BACKEND/api/v1/register/" \
+        -H "Content-Type: application/json" \
+        -d "{\"username\":\"$TEST_USER\",\"email\":\"$TEST_EMAIL\",\"password\":\"$TEST_PASS\"}")
+
+    if echo "$reg_resp" | grep -q '"username"'; then
+        # Registration successful, now login
+        login_resp=$(curl -s -m 30 -X POST "$BACKEND/api/v1/token/" \
+            -H "Content-Type: application/json" \
+            -d "{\"username\":\"$TEST_USER\",\"password\":\"$TEST_PASS\"}")
+        if echo "$login_resp" | grep -q '"access"'; then
+            ACCESS_TOKEN=$(echo "$login_resp" | python3 -c "import sys, json; print(json.load(sys.stdin)['access'])" 2>/dev/null)
+            echo "PASS  registration + login successful"
+            return 0
+        fi
+    fi
+
+    echo "FAIL  authentication failed: $login_resp"
+    fail=1
+    return 1
+}
+
 echo "== Frontend ($FRONTEND) =="
 check_http "root"              "$FRONTEND/" 200
 check_http "deep link /register"  "$FRONTEND/register" 200
@@ -74,9 +117,13 @@ else
 fi
 
 if [ "${SKIP_PREDICT:-0}" != "1" ]; then
+    authenticate || exit 1
+
     echo "== Predict (slow, ~40s) =="
     body=$(curl -s -m 300 -X POST "$BACKEND/api/v1/predict/" \
-        -H "Content-Type: application/json" -d '{"ticker":"AAPL"}')
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $ACCESS_TOKEN" \
+        -d '{"ticker":"AAPL"}')
     if echo "$body" | grep -q '"status":"success"'; then
         echo "PASS  predict returned success"
         # Validate new response structure with data arrays

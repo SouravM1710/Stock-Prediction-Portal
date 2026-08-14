@@ -12,7 +12,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const [error, setError] = useState('')
-  const {isLoggedIn, setIsLoggedIn} = useContext(AuthContext)
+  const {setIsLoggedIn} = useContext(AuthContext)
 
   const handleLogin = async (e) =>{
     e.preventDefault();

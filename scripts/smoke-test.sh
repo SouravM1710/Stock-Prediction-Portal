@@ -28,6 +28,28 @@ check_http() {
     fi
 }
 
+check_json_key() {
+    local name="$1" body="$2" key="$3"
+    if echo "$body" | grep -q "\"$key\":"; then
+        echo "PASS  $name has key '$key'"
+    else
+        echo "FAIL  $name missing key '$key'"
+        fail=1
+    fi
+}
+
+check_array_length() {
+    local name="$1" body="$2" key="$3" min_len="$4"
+    # Use python to parse JSON and check array length
+    len=$(echo "$body" | python3 -c "import sys, json; d=json.load(sys.stdin); print(len(d.get('$key', [])))" 2>/dev/null || echo 0)
+    if [ "$len" -ge "$min_len" ]; then
+        echo "PASS  $name '$key' length=$len (>= $min_len)"
+    else
+        echo "FAIL  $name '$key' length=$len (expected >= $min_len)"
+        fail=1
+    fi
+}
+
 echo "== Frontend ($FRONTEND) =="
 check_http "root"              "$FRONTEND/" 200
 check_http "deep link /register"  "$FRONTEND/register" 200
@@ -57,6 +79,28 @@ if [ "${SKIP_PREDICT:-0}" != "1" ]; then
         -H "Content-Type: application/json" -d '{"ticker":"AAPL"}')
     if echo "$body" | grep -q '"status":"success"'; then
         echo "PASS  predict returned success"
+        # Validate new response structure with data arrays
+        check_json_key "predict" "$body" "historical_prices"
+        check_json_key "predict" "$body" "historical_dates"
+        check_json_key "predict" "$body" "ma100"
+        check_json_key "predict" "$body" "ma200"
+        check_json_key "predict" "$body" "y_test"
+        check_json_key "predict" "$body" "y_predicted"
+        check_json_key "predict" "$body" "test_indices"
+        check_json_key "predict" "$body" "mse"
+        check_json_key "predict" "$body" "rmse"
+        check_json_key "predict" "$body" "r2"
+        # Check array lengths are reasonable (at least some data points)
+        check_array_length "predict" "$body" "historical_prices" 100
+        check_array_length "predict" "$body" "y_test" 10
+        check_array_length "predict" "$body" "y_predicted" 10
+        # Ensure old image URL keys are NOT present (backward compatibility check)
+        if echo "$body" | grep -q '"plot_img"'; then
+            echo "FAIL  predict still returns old 'plot_img' key"
+            fail=1
+        else
+            echo "PASS  predict no longer returns legacy image URL keys"
+        fi
     else
         echo "FAIL  predict: $body"
         fail=1

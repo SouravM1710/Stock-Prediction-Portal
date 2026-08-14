@@ -1,8 +1,18 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faSpinner } from '@fortawesome/free-solid-svg-icons'
 
 import axiosInstance from '../../axiosInstance';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 
 // Free-tier hosts (Render) cold-start the TensorFlow model on the first
 // predict after idle, which can fail once. Only these conditions are worth
@@ -17,19 +27,12 @@ const Dashboard = () => {
     const [ticker, setTicker] = useState('')
     const [error, setError] = useState()
     const [loading, setLoading] = useState(false)
-    const [plot, setPlot] = useState()
-    const [ma100, setMA100] = useState()
-    const [ma200, setMA200] = useState()
-    const [prediction, setPrediction] = useState()
-    const [mse, setMSE] = useState()
-    const [rmse, setRMSE] = useState()
-    const [r2, setR2] = useState()
-
+    const [chartData, setChartData] = useState(null)
 
     useEffect(()=>{
         const fetchProtectedData = async () =>{
             try {
-                const response = await axiosInstance.get('/protected-view/' );
+                await axiosInstance.get('/protected-view/' );
             } catch (error) {
                 console.error("Error fetching protected data:", error);
             }
@@ -37,10 +40,34 @@ const Dashboard = () => {
         fetchProtectedData();
     },[])
 
+    // Prepare data for historical price chart (Close + MA100 + MA200)
+    const historicalChartData = useMemo(() => {
+        if (!chartData) return [];
+        const { historical_prices, historical_dates, ma100, ma200 } = chartData;
+        return historical_prices.map((price, i) => ({
+            date: historical_dates[i],
+            price: price,
+            ma100: ma100[i],
+            ma200: ma200[i],
+        })).filter(d => d.price !== null && !isNaN(d.price));
+    }, [chartData]);
+
+    // Prepare data for prediction chart (Actual vs Predicted)
+    const predictionChartData = useMemo(() => {
+        if (!chartData) return [];
+        const { y_test, y_predicted, test_indices } = chartData;
+        return y_test.map((actual, i) => ({
+            index: test_indices[i],
+            actual: actual,
+            predicted: y_predicted[i],
+        }));
+    }, [chartData]);
+
     const handleSubmit = async (e) =>{
         e.preventDefault();
         setLoading(true)
         setError(null)
+        setChartData(null)
         try {
             const callPredict = () => axiosInstance.post('/predict/',{ ticker: ticker })
             let response
@@ -54,22 +81,11 @@ const Dashboard = () => {
                 }
             }
             console.log(response.data)
-            const backendRoot = import.meta.env.VITE_BACKEND_ROOT
-            const plotUrl = `${backendRoot}${response.data.plot_img}`
-            const ma100Url = `${backendRoot}${response.data.plot_100_dma}`
-            const ma200Url = `${backendRoot}${response.data.plot_200_dma}`
-            const predictionUrl = `${backendRoot}${response.data.plot_prediction}`
-
-            setPlot(plotUrl)
-            setMA100(ma100Url)
-            setMA200(ma200Url)
-            setPrediction(predictionUrl)
-            setMSE(response.data.mse)
-            setRMSE(response.data.rmse)
-            setR2(response.data.r2)
 
             if(response.data.error){
                 setError(response.data.error)
+            } else {
+                setChartData(response.data)
             }
         } catch (error) {
             console.error("Prediction failed:", error);
@@ -90,44 +106,142 @@ const Dashboard = () => {
                 </form>
             </div>
 
-            {/* Print prediction plots */}
-            {prediction && (
-                
+            {/* Historical Price Chart with Moving Averages */}
+            {chartData && historicalChartData.length > 0 && (
                 <div className="prediction mt-5">
-                <div className="p-3">
-                    {plot && (
-                        <img src={plot} style={{ maxWidth: '100%' }} />
-                    )}
-                </div>
+                    <div className="p-3">
+                        <h4 className="text-light mb-3">{ticker.toUpperCase()} — Historical Price & Moving Averages</h4>
+                        <div style={{ width: '100%', height: 400 }}>
+                            <ResponsiveContainer>
+                                <LineChart data={historicalChartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                                    <XAxis
+                                        dataKey="date"
+                                        tick={{ fill: '#aaa', fontSize: 11 }}
+                                        tickLine={{ stroke: '#444' }}
+                                        axisLine={{ stroke: '#444' }}
+                                        interval="preserveStartEnd"
+                                    />
+                                    <YAxis
+                                        tick={{ fill: '#aaa', fontSize: 11 }}
+                                        tickLine={{ stroke: '#444' }}
+                                        axisLine={{ stroke: '#444' }}
+                                        tickFormatter={(value) => `$${value.toFixed(2)}`}
+                                    />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: '#1e1e1e', border: '1px solid #333', borderRadius: '4px' }}
+                                        labelStyle={{ color: '#fff' }}
+                                        formatter={(value) => [`$${value.toFixed(2)}`, 'Price']}
+                                    />
+                                    <Legend wrapperStyle={{ color: '#fff', paddingTop: '10px' }} />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="price"
+                                        stroke="#00d4aa"
+                                        strokeWidth={1.5}
+                                        dot={false}
+                                        name="Closing Price"
+                                        activeDot={{ r: 4, strokeWidth: 2 }}
+                                    />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="ma100"
+                                        stroke="#ff6b6b"
+                                        strokeWidth={1}
+                                        dot={false}
+                                        name="100-Day MA"
+                                        activeDot={{ r: 4, strokeWidth: 2 }}
+                                    />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="ma200"
+                                        stroke="#4ecdc4"
+                                        strokeWidth={1}
+                                        dot={false}
+                                        name="200-Day MA"
+                                        activeDot={{ r: 4, strokeWidth: 2 }}
+                                    />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
 
-                <div className="p-3">
-                    {ma100 && (
-                        <img src={ma100} style={{ maxWidth: '100%' }} />
-                    )}
-                </div>
+                    {/* Actual vs Predicted Chart */}
+                    <div className="p-3">
+                        <h4 className="text-light mb-3">Prediction vs Actual (Test Period)</h4>
+                        <div style={{ width: '100%', height: 400 }}>
+                            <ResponsiveContainer>
+                                <LineChart data={predictionChartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                                    <XAxis
+                                        dataKey="index"
+                                        tick={{ fill: '#aaa', fontSize: 11 }}
+                                        tickLine={{ stroke: '#444' }}
+                                        axisLine={{ stroke: '#444' }}
+                                        label={{ value: 'Days (Test Period)', position: 'insideBottom', offset: -10, fill: '#888' }}
+                                    />
+                                    <YAxis
+                                        tick={{ fill: '#aaa', fontSize: 11 }}
+                                        tickLine={{ stroke: '#444' }}
+                                        axisLine={{ stroke: '#444' }}
+                                        tickFormatter={(value) => `$${value.toFixed(2)}`}
+                                    />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: '#1e1e1e', border: '1px solid #333', borderRadius: '4px' }}
+                                        labelStyle={{ color: '#fff' }}
+                                        labelFormatter={(label) => `Day ${label}`}
+                                        formatter={(value, name) => [`$${value.toFixed(2)}`, name]}
+                                    />
+                                    <Legend wrapperStyle={{ color: '#fff', paddingTop: '10px' }} />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="actual"
+                                        stroke="#00d4aa"
+                                        strokeWidth={1.5}
+                                        dot={false}
+                                        name="Actual Price"
+                                        activeDot={{ r: 4, strokeWidth: 2 }}
+                                    />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="predicted"
+                                        stroke="#ff6b6b"
+                                        strokeWidth={1.5}
+                                        dot={false}
+                                        name="Predicted Price"
+                                        activeDot={{ r: 4, strokeWidth: 2 }}
+                                    />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
 
-                <div className="p-3">
-                    {ma200 && (
-                        <img src={ma200} style={{ maxWidth: '100%' }} />
-                    )}
+                    {/* Model Evaluation Metrics */}
+                    <div className="text-light p-3">
+                        <h4 className="mb-3">Model Evaluation</h4>
+                        <div className="row">
+                            <div className="col-md-4">
+                                <div className="bg-dark p-3 rounded text-center">
+                                    <div className="text-muted small">MSE</div>
+                                    <div className="fs-4 fw-bold">{chartData.mse ? chartData.mse.toFixed(4) : '—'}</div>
+                                </div>
+                            </div>
+                            <div className="col-md-4">
+                                <div className="bg-dark p-3 rounded text-center">
+                                    <div className="text-muted small">RMSE</div>
+                                    <div className="fs-4 fw-bold">{chartData.rmse ? chartData.rmse.toFixed(4) : '—'}</div>
+                                </div>
+                            </div>
+                            <div className="col-md-4">
+                                <div className="bg-dark p-3 rounded text-center">
+                                    <div className="text-muted small">R²</div>
+                                    <div className="fs-4 fw-bold">{chartData.r2 !== undefined ? chartData.r2.toFixed(4) : '—'}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-
-                <div className="p-3">
-                    {prediction && (
-                        <img src={prediction} style={{ maxWidth: '100%' }} />
-                    )}
-                </div>
-
-                <div className="text-light p-3">
-                    <h4>Model Evalulation</h4>
-                    <p>Mean Squared Error (MSE): {mse}</p>
-                    <p>Root Mean Squared Error (RMSE): {rmse}</p>
-                    <p>R-Squared: {r2}</p>
-                </div>
-
-            </div>
             )}
-
         </div>
     </div>
   )

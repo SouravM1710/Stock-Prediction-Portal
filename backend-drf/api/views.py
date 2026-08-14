@@ -152,8 +152,9 @@ class StockPredictionAPIView(APIView):
 
     def _run_prediction(self, ticker):
         # Fetch the data from yfinance (with retries for transient failures)
+        # Limit to ~3 years to reduce memory (model only needs ~100+ days for windows)
         now = datetime.now()
-        start = datetime(now.year - 10, now.month, now.day)
+        start = datetime(now.year - 3, now.month, now.day)
         end = now
         df = None
         for attempt in range(3):
@@ -203,7 +204,7 @@ class StockPredictionAPIView(APIView):
         x_test, y_test = np.array(x_test), np.array(y_test)
 
         # Making Predictions (batch processing to limit memory)
-        batch_size = 32
+        batch_size = 16  # smaller batch to reduce peak memory
         y_predicted_batches = []
         for i in range(0, len(x_test), batch_size):
             batch = x_test[i:i + batch_size]
@@ -220,10 +221,12 @@ class StockPredictionAPIView(APIView):
         r2 = r2_score(y_test, y_predicted)
 
         # Prepare historical dates as ISO strings for frontend charting
-        historical_dates = df.Date.dt.strftime("%Y-%m-%d").tolist()
-        historical_prices = df.Close.tolist()
-        ma100_list = ma100.tolist()
-        ma200_list = ma200.tolist()
+        # Limit historical data returned to last 500 points to reduce response size
+        hist_limit = 500
+        historical_dates = df.Date.dt.strftime("%Y-%m-%d").tolist()[-hist_limit:]
+        historical_prices = df.Close.tolist()[-hist_limit:]
+        ma100_list = ma100.tolist()[-hist_limit:]
+        ma200_list = ma200.tolist()[-hist_limit:]
 
         # Test period indices (0-based for the prediction chart x-axis)
         test_indices = list(range(len(y_test)))

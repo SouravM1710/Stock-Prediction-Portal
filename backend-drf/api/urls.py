@@ -1,7 +1,7 @@
 from django.urls import path
 from accounts import views as UserViews
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from .views import StockPredictionAPIView, HealthView
+from .views import StockPredictionAPIView, HealthView, ModelTestView
 
 
 urlpatterns = [
@@ -10,6 +10,7 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('protected-view/',UserViews.ProtectedView.as_view()),
     path('health/', HealthView.as_view(), name='health'),
+    path('model-test/', ModelTestView.as_view(), name='model-test'),
 
     # Prediction API
 

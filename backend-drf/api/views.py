@@ -88,6 +88,34 @@ class HealthView(APIView):
         return Response({"status": "ok"})
 
 
+class ModelTestView(APIView):
+    """Test endpoint to verify model loads without doing prediction."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            model = get_model()
+            return Response({
+                "status": "ok",
+                "model_loaded": True,
+                "model_type": str(type(model)),
+                "model_inputs": str(model.input_shape) if hasattr(model, 'input_shape') else "unknown",
+                "model_outputs": str(model.output_shape) if hasattr(model, 'output_shape') else "unknown",
+            })
+        except MemoryError as e:
+            logger.exception("MemoryError loading model")
+            return Response(
+                {"status": "error", "error": "MemoryError: " + str(e)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        except Exception as e:
+            logger.exception("Error loading model")
+            return Response(
+                {"status": "error", "error": f"{type(e).__name__}: {e}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
 class StockPredictionAPIView(APIView):
     permission_classes = [IsAuthenticated]
 

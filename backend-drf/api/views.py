@@ -108,6 +108,13 @@ class StockPredictionAPIView(APIView):
         except ValueError as e:
             # Invalid ticker / no data — return 404 without version leak
             return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
+        except MemoryError as e:
+            # OOM during model load or prediction — return structured error
+            logger.exception("MemoryError during prediction for ticker=%s", ticker)
+            return Response(
+                {"error": "Server memory limit exceeded. Please try again later."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         except Exception as e:
             logger.exception("Prediction failed for ticker=%s", ticker)
             return Response(
@@ -116,12 +123,21 @@ class StockPredictionAPIView(APIView):
             )
 
     def _run_prediction(self, ticker):
-        # Fetch the data from yfinance
+        # Fetch the data from yfinance (with retries for transient failures)
         now = datetime.now()
         start = datetime(now.year - 10, now.month, now.day)
         end = now
-        df = yf.download(ticker, start, end, progress=False)
-        if df.empty:
+        df = None
+        for attempt in range(3):
+            try:
+                df = yf.download(ticker, start, end, progress=False)
+                if df is not None and not df.empty:
+                    break
+            except Exception as e:
+                logger.warning("yfinance attempt %d failed for %s: %s", attempt + 1, ticker, e)
+                if attempt == 2:
+                    raise
+        if df is None or df.empty:
             raise ValueError("No data found for the given ticker.")
 
         # yfinance >=0.2.40 returns MultiIndex columns for single tickers;

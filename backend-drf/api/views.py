@@ -202,8 +202,13 @@ class StockPredictionAPIView(APIView):
             y_test.append(input_data[i, 0])
         x_test, y_test = np.array(x_test), np.array(y_test)
 
-        # Making Predictions
-        y_predicted = model.predict(x_test)
+        # Making Predictions (batch processing to limit memory)
+        batch_size = 32
+        y_predicted_batches = []
+        for i in range(0, len(x_test), batch_size):
+            batch = x_test[i:i + batch_size]
+            y_predicted_batches.append(model.predict(batch, verbose=0))
+        y_predicted = np.vstack(y_predicted_batches)
 
         # Revert the scaled prices to original price
         y_predicted = scaler.inverse_transform(y_predicted.reshape(-1, 1)).flatten()
